@@ -1163,7 +1163,11 @@ class AgentSession(rtc.EventEmitter[EventTypes], Generic[Userdata_T]):
             self._user_away_timer = None
 
     def _update_agent_state(
-        self, state: AgentState, *, otel_context: otel_context.Context | None = None
+        self,
+        state: AgentState,
+        *,
+        otel_context: otel_context.Context | None = None,
+        start_time: int | None = None,
     ) -> None:
         if self._agent_state == state:
             return
@@ -1174,7 +1178,7 @@ class AgentSession(rtc.EventEmitter[EventTypes], Generic[Userdata_T]):
 
             if self._agent_speaking_span is None:
                 self._agent_speaking_span = tracer.start_span(
-                    "agent_speaking", context=otel_context
+                    "agent_speaking", context=otel_context, start_time=start_time or time.time_ns()
                 )
 
                 if self._room_io:
@@ -1200,13 +1204,15 @@ class AgentSession(rtc.EventEmitter[EventTypes], Generic[Userdata_T]):
         )
 
     def _update_user_state(
-        self, state: UserState, *, last_speaking_time: float | None = None
+        self, state: UserState, *, last_speaking_time: int | None = None
     ) -> None:
         if self._user_state == state:
             return
 
         if state == "speaking" and self._user_speaking_span is None:
-            self._user_speaking_span = tracer.start_span("user_speaking")
+            self._user_speaking_span = tracer.start_span(
+                "user_speaking", start_time=last_speaking_time or time.time_ns()
+            )
 
             if self._room_io and self._room_io.linked_participant:
                 _set_participant_attributes(
